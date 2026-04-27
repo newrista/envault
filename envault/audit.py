@@ -43,7 +43,12 @@ def read_events(vault_dir: str) -> List[dict]:
         for line in fh:
             line = line.strip()
             if line:
-                events.append(json.loads(line))
+                try:
+                    events.append(json.loads(line))
+                except json.JSONDecodeError:
+                    # Skip malformed lines rather than crashing; they may result
+                    # from a partial write or external corruption.
+                    continue
     return events
 
 
