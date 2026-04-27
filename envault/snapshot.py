@@ -16,13 +16,18 @@ def _snapshot_dir(vault_dir: Path) -> Path:
     return d
 
 
+def _sanitize_slug(label: str) -> str:
+    """Return a filesystem-safe slug derived from *label*."""
+    return "".join(c if c.isalnum() or c in "-_" else "_" for c in label)
+
+
 def create_snapshot(vault_dir: Path, secrets: Dict[str, str], label: Optional[str] = None) -> Path:
     """Persist a snapshot of *secrets* inside *vault_dir*.
 
     Returns the path of the written snapshot file.
     """
     ts = int(time.time())
-    slug = label.replace(" ", "_") if label else "snap"
+    slug = _sanitize_slug(label) if label else "snap"
     filename = f"{ts}_{slug}.json"
     snapshot_path = _snapshot_dir(vault_dir) / filename
     payload = {
