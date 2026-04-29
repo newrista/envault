@@ -1,102 +1,98 @@
-"""CLI entry point for envault."""
+"""Main CLI entry point for envault."""
 
 import click
+from pathlib import Path
 from envault.vault import Vault
-from envault.rotation import rotate_secret, list_stale_secrets
+from envault.cli_audit import audit_group
+from envault.cli_diff import diff_group
+from envault.cli_snapshot import snapshot_group
+from envault.cli_tags import tags_group
+from envault.cli_access import access_group
+from envault.cli_export import export_group
+from envault.cli_alias import alias_group
+from envault.cli_groups import groups_group
+from envault.cli_hooks import hooks_group
 
 
 @click.group()
 def cli():
-    """envault — secure environment variable manager."""
-    pass
+    """envault — Secure environment variable manager."""
 
 
 @cli.command()
-@click.argument("vault_path")
-@click.password_option(prompt="Master password")
-def init_vault(vault_path, password):
-    """Initialise a new vault at VAULT_PATH."""
-    vault = Vault(vault_path, password)
+@click.option("--vault-dir", default=".", help="Directory for the vault.")
+@click.password_option()
+def init_vault(vault_dir, password):
+    """Initialise a new vault."""
+    vault = Vault(Path(vault_dir), password)
     if vault.exists():
-        click.echo(f"Vault already exists at {vault_path}")
-        return
+        raise click.ClickException("Vault already exists.")
     vault.save({})
-    click.echo(f"Vault initialised at {vault_path}")
+    click.echo("Vault initialised.")
 
 
 @cli.command()
-@click.argument("vault_path")
 @click.argument("key")
 @click.argument("value")
-@click.password_option(prompt="Master password")
-def set_secret(vault_path, key, value, password):
-    """Store or update a secret KEY=VALUE in the vault."""
-    vault = Vault(vault_path, password)
+@click.option("--vault-dir", default=".", help="Directory for the vault.")
+@click.option("--password", prompt=True, hide_input=True)
+def set_secret(key, value, vault_dir, password):
+    """Set a secret KEY to VALUE."""
+    vault = Vault(Path(vault_dir), password)
     secrets = vault.load()
     secrets[key] = value
     vault.save(secrets)
-    click.echo(f"Secret '{key}' saved.")
+    click.echo(f"Set {key}.")
 
 
 @cli.command()
-@click.argument("vault_path")
 @click.argument("key")
-@click.password_option(prompt="Master password")
-def get_secret(vault_path, key, password):
-    """Retrieve a secret by KEY from the vault."""
-    vault = Vault(vault_path, password)
+@click.option("--vault-dir", default=".", help="Directory for the vault.")
+@click.option("--password", prompt=True, hide_input=True)
+def get_secret(key, vault_dir, password):
+    """Get the value of secret KEY."""
+    vault = Vault(Path(vault_dir), password)
     secrets = vault.load()
     if key not in secrets:
-        click.echo(f"Key '{key}' not found.", err=True)
-        raise SystemExit(1)
+        raise click.ClickException(f"Key '{key}' not found.")
     click.echo(secrets[key])
 
 
 @cli.command()
-@click.argument("vault_path")
-@click.password_option(prompt="Master password")
-def list_vaults(vault_path, password):
-    """List all secret keys stored in the vault."""
-    vault = Vault(vault_path, password)
+@click.option("--vault-dir", default=".", help="Directory for the vault.")
+@click.option("--password", prompt=True, hide_input=True)
+def list_secrets(vault_dir, password):
+    """List all secret keys in the vault."""
+    vault = Vault(Path(vault_dir), password)
     secrets = vault.load()
-    keys = [k for k in secrets if not k.startswith("__")]
-    for key in keys:
+    for key in sorted(secrets):
         click.echo(key)
 
 
 @cli.command()
-@click.argument("vault_path")
 @click.argument("key")
-@click.argument("new_value")
-@click.password_option(prompt="Master password")
-def rotate(vault_path, key, new_value, password):
-    """Rotate a secret KEY to NEW_VALUE and record rotation timestamp."""
-    vault = Vault(vault_path, password)
+@click.option("--vault-dir", default=".", help="Directory for the vault.")
+@click.option("--password", prompt=True, hide_input=True)
+def delete_secret(key, vault_dir, password):
+    """Delete secret KEY from the vault."""
+    vault = Vault(Path(vault_dir), password)
     secrets = vault.load()
     if key not in secrets:
-        click.echo(f"Key '{key}' not found.", err=True)
-        raise SystemExit(1)
-    secrets = rotate_secret(secrets, key, new_value)
+        raise click.ClickException(f"Key '{key}' not found.")
+    del secrets[key]
     vault.save(secrets)
-    click.echo(f"Secret '{key}' rotated successfully.")
+    click.echo(f"Deleted {key}.")
 
 
-@cli.command()
-@click.argument("vault_path")
-@click.option("--max-age", default=90, show_default=True, help="Max age in days before rotation is due.")
-@click.password_option(prompt="Master password")
-def check_rotation(vault_path, max_age, password):
-    """List secrets that are due for rotation."""
-    vault = Vault(vault_path, password)
-    secrets = vault.load()
-    stale = list_stale_secrets(secrets, max_age_days=max_age)
-    if not stale:
-        click.echo("All secrets are up to date.")
-    else:
-        click.echo("Secrets due for rotation:")
-        for key in stale:
-            click.echo(f"  - {key}")
-
+cli.add_command(audit_group, "audit")
+cli.add_command(diff_group, "diff")
+cli.add_command(snapshot_group, "snapshot")
+cli.add_command(tags_group, "tags")
+cli.add_command(access_group, "access")
+cli.add_command(export_group, "export")
+cli.add_command(alias_group, "alias")
+cli.add_command(groups_group, "groups")
+cli.add_command(hooks_group, "hooks")
 
 if __name__ == "__main__":
     cli()
