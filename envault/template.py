@@ -53,3 +53,20 @@ def render_dict(
 ) -> Dict[str, str]:
     """Render every value in a dict of templates using the provided secrets."""
     return {k: render(v, secrets, strict=strict) for k, v in templates.items()}
+
+
+def validate_template(template: str, secrets: Dict[str, str]) -> list[str]:
+    """Return a list of placeholder keys in the template that are missing from secrets.
+
+    Useful for pre-flight checks before rendering, allowing callers to report
+    all missing keys at once rather than failing on the first missing key.
+
+    Args:
+        template: A string containing {{KEY}} placeholders.
+        secrets: A dict of secret key/value pairs.
+
+    Returns:
+        A list of keys referenced in the template but absent from secrets.
+        An empty list means the template can be rendered without errors.
+    """
+    return [key for key in list_placeholders(template) if key not in secrets]
