@@ -56,6 +56,14 @@ def test_roundtrip_preserves_secrets(tmp_path: Path) -> None:
     assert decompress_secrets(dest) == secrets
 
 
+def test_compress_empty_secrets(tmp_path: Path) -> None:
+    """Compressing an empty dict should produce a readable file with no secrets."""
+    dest = tmp_path / "empty.gz"
+    compress_secrets({}, dest)
+    assert dest.exists()
+    assert decompress_secrets(dest) == {}
+
+
 def test_decompress_missing_file_raises(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
         decompress_secrets(tmp_path / "nonexistent.gz")
